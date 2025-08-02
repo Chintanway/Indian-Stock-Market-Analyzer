@@ -1,0 +1,244 @@
+/* Custom CSS for Indian Stock Market Analyzer */
+
+:root {
+    --primary-color: #2563eb;
+    --success-color: #16a34a;
+    --warning-color: #d97706;
+    --danger-color: #dc2626;
+    --dark-color: #1f2937;
+}
+
+body {
+    background-color: #f8fafc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+    border: none;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    border: none;
+    font-weight: 600;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+/* Indicator Cards */
+.indicator-card {
+    text-align: center;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.indicator-label {
+    font-size: 0.85rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.indicator-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--dark-color);
+    margin-bottom: 5px;
+}
+
+.indicator-status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+}
+
+.indicator-status.bullish {
+    background-color: #dcfce7;
+    color: var(--success-color);
+}
+
+.indicator-status.bearish {
+    background-color: #fef2f2;
+    color: var(--danger-color);
+}
+
+.indicator-status.neutral {
+    background-color: #f1f5f9;
+    color: #64748b;
+}
+
+/* Signal Badges */
+.badge.bg-success {
+    background-color: var(--success-color) !important;
+}
+
+.badge.bg-danger {
+    background-color: var(--danger-color) !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--warning-color) !important;
+    color: white !important;
+}
+
+.badge.bg-secondary {
+    background-color: #64748b !important;
+}
+
+/* Quick Symbol Buttons */
+.quick-symbol {
+    border-radius: 20px;
+    font-size: 0.8rem;
+    padding: 5px 12px;
+}
+
+.quick-symbol:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+
+/* Loading Animation */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
+}
+
+/* Chart Container */
+#priceChart {
+    min-height: 400px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .h3 {
+        font-size: 1.5rem;
+    }
+    
+    .indicator-card {
+        margin-bottom: 15px;
+    }
+    
+    .card-body .row .col-md-3,
+    .card-body .row .col-md-4,
+    .card-body .row .col-md-6 {
+        margin-bottom: 15px;
+    }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Animations */
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.btn {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Form enhancements */
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25);
+}
+
+/* Alert enhancements */
+.alert {
+    border: none;
+    border-radius: 8px;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+}
+
+/* Price change indicators */
+.price-up {
+    color: var(--success-color);
+}
+
+.price-down {
+    color: var(--danger-color);
+}
+
+.price-neutral {
+    color: #64748b;
+}
+
+/* Investment Recommendation Styling */
+#recommendationContainer {
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+#recommendationContainer:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+#recommendationIcon {
+    font-size: 2.5rem;
+    line-height: 1;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Recommendation Badge Animation */
+#recommendationBadge {
+    animation: fadeInScale 0.5s ease-out;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+}
+
+@keyframes fadeInScale {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}

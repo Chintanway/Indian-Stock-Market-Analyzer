@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📈 Indian Stock Market Analyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="row bg-primary text-white py-3 mb-4">
+            <div class="col-12">
+                <h1 class="text-center mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Indian Stock Market Analyzer
+                </h1>
+                <p class="text-center mb-0 mt-2">AI-Powered Technical Analysis for NSE Stocks</p>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <ul class="nav nav-tabs" id="mainTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="stock-analysis-tab" data-bs-toggle="tab" data-bs-target="#stock-analysis" type="button" role="tab">
+                            <i class="fas fa-chart-line me-2"></i>Stock Analysis
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="ipo-tracker-tab" data-bs-toggle="tab" data-bs-target="#ipo-tracker" type="button" role="tab">
+                            <i class="fas fa-rocket me-2"></i>IPO Tracker
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="volume-tracker-tab" data-bs-toggle="tab" data-bs-target="#volume-tracker" type="button" role="tab">
+                            <i class="fas fa-chart-bar me-2"></i>Volume Tracker
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="mainTabContent">
+            <!-- Stock Analysis Tab -->
+            <div class="tab-pane fade show active" id="stock-analysis" role="tabpanel">
+                <div class="row">
+                    <!-- Input Section -->
+                    <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-dark text-white">
+                        <h5><i class="fas fa-search me-2"></i>Stock Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="analyzeForm">
+                            <div class="mb-3">
+                                <label for="symbol" class="form-label">NSE Stock Symbol</label>
+                                <input type="text" class="form-control" id="symbol" name="symbol" 
+                                       placeholder="e.g., RELIANCE, TCS, INFY, ADANIGREEN" required maxlength="20">
+                                <div class="form-text">Enter NSE stock symbol (max 20 characters)</div>
+                                <div class="form-text"><strong>Popular symbols:</strong> RELIANCE, TCS, INFY, HDFCBANK, ICICIBANK, ADANIGREEN, JSWSTEEL, MARUTI</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="analyzeBtn">
+                                <i class="fas fa-chart-bar me-2"></i>Analyze Stock
+                            </button>
+                        </form>
+
+                        <!-- Popular Stocks -->
+                        <div class="mt-4">
+                            <h6>Popular Stocks:</h6>
+                            <div class="d-flex flex-wrap gap-2" id="popularStocks">
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="RELIANCE">RELIANCE</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="TCS">TCS</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="INFY">INFY</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="HDFCBANK">HDFCBANK</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="ICICIBANK">ICICIBANK</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="BHARTIARTL">BHARTIARTL</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="ADANIGREEN">ADANIGREEN</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="JSWSTEEL">JSWSTEEL</button>
+                                <button class="btn btn-outline-secondary btn-sm quick-symbol" data-symbol="MARUTI">MARUTI</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Model Info -->
+                <div class="card shadow-sm mt-3" id="modelInfo" style="display: none;">
+                    <div class="card-header bg-success text-white">
+                        <h6><i class="fas fa-brain me-2"></i>AI Model Performance</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-success" id="trainAccuracy">-</div>
+                                    <small>Training Accuracy</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-info" id="testAccuracy">-</div>
+                                    <small>Test Accuracy</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div class="col-md-8">
+                <!-- Loading -->
+                <div id="loading" class="text-center" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing stock data and training AI model...</p>
+                </div>
+
+                <!-- Error -->
+                <div id="error" class="alert alert-danger" style="display: none;"></div>
+
+                <!-- Results -->
+                <div id="results" style="display: none;">
+                    <!-- Price Summary -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <h5 id="stockTitle"><i class="fas fa-chart-line me-2"></i>Stock Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h3 text-primary" id="currentPrice">₹0</div>
+                                        <small>Current Price</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h3 text-success" id="predictedPrice">₹0</div>
+                                        <small>AI Predicted Price</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h3 text-warning" id="targetPrice">₹0</div>
+                                        <small>Target Price</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h3 text-danger" id="stopLoss">₹0</div>
+                                        <small>Stop Loss</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <span class="badge fs-6" id="signal">NEUTRAL</span>
+                                        <div><small>Trading Signal</small></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="h5" id="predictionChange">0%</div>
+                                        <small>Predicted Change</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="small text-success" id="dataTimestamp">-</div>
+                                        <small>Analysis Time</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Investment Recommendation -->
+                    <div class="card shadow-sm mb-3" id="investmentRecommendation" style="display: none;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-lightbulb me-2"></i>Investment Advisory</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="text-center p-3 rounded" id="recommendationContainer" style="background: linear-gradient(135deg, #f8f9fa, #e9ecef);">
+                                        <div class="display-6 mb-2" id="recommendationIcon">📊</div>
+                                        <span class="badge fs-4 px-3 py-2" id="recommendationBadge">HOLD</span>
+                                        <div class="mt-2"><small class="text-muted">Investment Recommendation</small></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h6" id="confidenceLevel">Medium</div>
+                                        <small>Confidence</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h6" id="riskLevel">Medium</div>
+                                        <small>Risk Level</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center">
+                                        <div class="h6" id="positionSize">-</div>
+                                        <small>Position Size</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <strong>Investment Horizon:</strong>
+                                    <span id="investmentHorizon">-</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Risk/Reward Ratio:</strong>
+                                    <span id="riskRewardRatio">-</span>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <strong>Key Reasons:</strong>
+                                <ul id="keyReasons" class="mt-2">
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Market Analysis -->
+                    <div class="card shadow-sm mb-3" id="marketAnalysis" style="display: none;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-area me-2"></i>Market Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="h6" id="momentum1w">0%</div>
+                                        <small>1-Week Momentum</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="h6" id="momentum1m">0%</div>
+                                        <small>1-Month Momentum</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="h6" id="volatility">0%</div>
+                                        <small>Volatility</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <strong>Sector:</strong>
+                                    <span id="sector">-</span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Volume Activity:</strong>
+                                    <span id="volumeActivity">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Technical Indicators -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-cogs me-2"></i>Technical Indicators</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">RSI (14)</div>
+                                        <div class="indicator-value" id="rsi">-</div>
+                                        <div class="indicator-status" id="rsiStatus">-</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">EMA (5)</div>
+                                        <div class="indicator-value" id="ema5">₹-</div>
+                                        <div class="indicator-status" id="ema5Status">-</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">MACD</div>
+                                        <div class="indicator-value" id="macd">-</div>
+                                        <div class="indicator-status" id="macdStatus">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">SMA (20)</div>
+                                        <div class="indicator-value" id="sma20">₹-</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">BB Upper</div>
+                                        <div class="indicator-value" id="bbUpper">₹-</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="indicator-card">
+                                        <div class="indicator-label">BB Lower</div>
+                                        <div class="indicator-value" id="bbLower">₹-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Price Chart -->
+                    <div class="card shadow-sm mb-3">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-candlestick me-2"></i>Price Chart & Technical Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="priceChart"></div>
+                        </div>
+                    </div>
+
+                    <!-- Analysis History -->
+                    <div class="card shadow-sm" id="historyCard" style="display: none;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-history me-2"></i>Analysis History</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Price</th>
+                                            <th>Predicted</th>
+                                            <th>Change</th>
+                                            <th>Signal</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="historyTable">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- IPO Tracker Tab -->
+            <div class="tab-pane fade" id="ipo-tracker" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card shadow-sm mb-4">
+                            <div class="card-header bg-success text-white">
+                                <h5><i class="fas fa-rocket me-2"></i>Upcoming IPOs - Next 7 Days</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <div>
+                                        <button class="btn btn-primary" id="refreshIPOs">
+                                            <i class="fas fa-sync-alt me-2"></i>Refresh IPOs
+                                        </button>
+                                        <button class="btn btn-outline-secondary ms-2" id="viewCalendar">
+                                            <i class="fas fa-calendar me-2"></i>30-Day Calendar
+                                        </button>
+                                    </div>
+                                    <div id="ipoLastUpdated" class="text-muted small"></div>
+                                </div>
+                                
+                                <!-- IPO Loading -->
+                                <div id="ipoLoading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading IPOs...</span>
+                                    </div>
+                                    <p class="mt-2">Fetching latest IPO data...</p>
+                                </div>
+                                
+                                <!-- IPO Results -->
+                                <div id="ipoResults">
+                                    <!-- IPO Summary Cards -->
+                                    <div class="row mb-4" id="ipoSummary" style="display: none;">
+                                        <div class="col-md-4">
+                                            <div class="card border-success">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-success" id="openIPOCount">0</h3>
+                                                    <p class="mb-0">Open for Application</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card border-warning">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-warning" id="upcomingIPOCount">0</h3>
+                                                    <p class="mb-0">Opening Soon</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="card border-info">
+                                                <div class="card-body text-center">
+                                                    <h3 class="text-info" id="totalIPOCount">0</h3>
+                                                    <p class="mb-0">Total IPOs</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- IPO List -->
+                                    <div id="ipoList"></div>
+                                    
+                                    <!-- No IPOs Message -->
+                                    <div id="noIPOs" class="text-center py-5" style="display: none;">
+                                        <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">No Upcoming IPOs</h5>
+                                        <p class="text-muted">There are no IPOs scheduled for the next 7 days.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+            
+            <!-- Volume Tracker Tab -->
+            <div class="tab-pane fade" id="volume-tracker" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card shadow-sm">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-chart-bar me-2"></i>Today's Volume Leaders
+                                    <button id="refreshVolume" class="btn btn-sm btn-light float-end">
+                                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                                    </button>
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Loading Indicator -->
+                                <div id="volumeLoading" class="text-center" style="display: none;">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p class="mt-2">Loading volume data...</p>
+                                </div>
+
+                                <!-- Error Message -->
+                                <div id="volumeError" class="alert alert-danger" style="display: none;">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    <span id="volumeErrorText"></span>
+                                </div>
+
+                                <!-- Tab Navigation -->
+                                <ul class="nav nav-tabs" id="volumeTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="most-bought-tab" data-bs-toggle="tab" data-bs-target="#most-bought" type="button" role="tab">
+                                            <i class="fas fa-arrow-up text-success me-1"></i> Most Bought
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="most-sold-tab" data-bs-toggle="tab" data-bs-target="#most-sold" type="button" role="tab">
+                                            <i class="fas fa-arrow-down text-danger me-1"></i> Most Sold
+                                        </button>
+                                    </li>
+                                </ul>
+
+                                <!-- Tab Content -->
+                                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="volumeTabContent">
+                                    <!-- Most Bought Stocks -->
+                                    <div class="tab-pane fade show active" id="most-bought" role="tabpanel" aria-labelledby="most-bought-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover" id="mostBoughtTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Symbol</th>
+                                                        <th>Price</th>
+                                                        <th>Change</th>
+                                                        <th>Volume</th>
+                                                        <th>Change %</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="mostBoughtBody">
+                                                    <!-- Will be populated by JavaScript -->
+                                                    <tr>
+                                                        <td colspan="6" class="text-center">Loading data...</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Most Sold Stocks -->
+                                    <div class="tab-pane fade" id="most-sold" role="tabpanel" aria-labelledby="most-sold-tab">
+                                        <div class="table-responsive">
+                                            <table class="table table-hover" id="mostSoldTable">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Symbol</th>
+                                                        <th>Price</th>
+                                                        <th>Change</th>
+                                                        <th>Volume</th>
+                                                        <th>Change %</th>
+                                                        <th>Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="mostSoldBody">
+                                                    <!-- Will be populated by JavaScript -->
+                                                    <tr>
+                                                        <td colspan="6" class="text-center">Loading data...</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer text-muted small">
+                                <i class="fas fa-info-circle me-1"></i> Data updates every 5 minutes. Last updated: <span id="volumeLastUpdated">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="bg-dark text-white text-center py-3 mt-5">
+            <p class="mb-0">© 2025 Indian Stock Market Analyzer | AI-Powered Technical Analysis</p>
+            <p class="mb-0"><small><strong>Disclaimer:</strong> This is for educational purposes only. Not financial advice.</small></p>
+            <p class="mb-0"><small><strong>Risk Management:</strong> Stop-loss levels are calculated using technical indicators. Always use proper position sizing.</small></p>
+            <p class="mb-0"><small>Note: Stock prices may have slight delays. Yahoo Finance data used for analysis.</small></p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
