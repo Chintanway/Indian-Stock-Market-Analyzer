@@ -783,30 +783,30 @@ document.addEventListener('DOMContentLoaded', function() {
         
         console.log('🔄 [DEBUG] Updating tables with data:', data);
         
-        // Update most bought stocks
+        // Update top volume stocks (using top_by_volume from backend)
         const mostBoughtBody = document.getElementById('mostBoughtBody');
-        if (data.most_bought && Array.isArray(data.most_bought) && data.most_bought.length > 0) {
-            console.log('🔼 [DEBUG] Most bought stocks:', data.most_bought);
-            mostBoughtBody.innerHTML = data.most_bought.map(stock => {
-                console.log(`📝 [DEBUG] Processing bought stock:`, stock);
-                return createVolumeTableRow(stock, 'bought');
+        if (data.top_by_volume && Array.isArray(data.top_by_volume) && data.top_by_volume.length > 0) {
+            console.log('🔼 [DEBUG] Top volume stocks:', data.top_by_volume);
+            mostBoughtBody.innerHTML = data.top_by_volume.map(stock => {
+                console.log(`📝 [DEBUG] Processing volume stock:`, stock);
+                return createVolumeTableRow(stock, 'volume');
             }).join('');
         } else {
-            console.warn('⚠️ [DEBUG] No most bought stocks data in response');
-            mostBoughtBody.innerHTML = '<tr><td colspan="6" class="text-center">No active buying data available</td></tr>';
+            console.warn('⚠️ [DEBUG] No top volume stocks data in response');
+            mostBoughtBody.innerHTML = '<tr><td colspan="6" class="text-center">No volume data available</td></tr>';
         }
         
-        // Update most sold stocks
+        // Update most active stocks (using most_active from backend)
         const mostSoldBody = document.getElementById('mostSoldBody');
-        if (data.most_sold && Array.isArray(data.most_sold) && data.most_sold.length > 0) {
-            console.log('🔽 [DEBUG] Most sold stocks:', data.most_sold);
-            mostSoldBody.innerHTML = data.most_sold.map(stock => {
-                console.log(`📝 [DEBUG] Processing sold stock:`, stock);
-                return createVolumeTableRow(stock, 'sold');
+        if (data.most_active && Array.isArray(data.most_active) && data.most_active.length > 0) {
+            console.log('🔽 [DEBUG] Most active stocks:', data.most_active);
+            mostSoldBody.innerHTML = data.most_active.map(stock => {
+                console.log(`📝 [DEBUG] Processing active stock:`, stock);
+                return createVolumeTableRow(stock, 'active');
             }).join('');
         } else {
-            console.warn('⚠️ [DEBUG] No most sold stocks data in response');
-            mostSoldBody.innerHTML = '<tr><td colspan="6" class="text-center">No active selling data available</td></tr>';
+            console.warn('⚠️ [DEBUG] No most active stocks data in response');
+            mostSoldBody.innerHTML = '<tr><td colspan="6" class="text-center">No active stocks data available</td></tr>';
         }
         
         // Add event listeners to analyze buttons
@@ -827,24 +827,30 @@ document.addEventListener('DOMContentLoaded', function() {
     function createVolumeTableRow(stock, type) {
         if (!stock) return '';
         
-        const priceChange = stock.price_change || 0;
-        const volumeChange = stock.volume_change || 0;
-        const priceChangeClass = priceChange > 0 ? 'text-success' : priceChange < 0 ? 'text-danger' : '';
-        const volumeChangeClass = volumeChange > 0 ? 'text-success' : volumeChange < 0 ? 'text-danger' : '';
-        const priceChangeIcon = priceChange > 0 ? '▲' : priceChange < 0 ? '▼' : '';
-        const volumeChangeIcon = volumeChange > 0 ? '▲' : volumeChange < 0 ? '▼' : '';
+        // Handle different data structures from backend
+        const price = stock.current_price || stock.price || 0;
+        const change = stock.price_change_pct || stock.change || 0;
+        const volume = stock.volume || 0;
+        const tradeCount = stock.trade_count || 0;
+        
+        // Format change with proper sign and color
+        const isPositive = change >= 0;
+        const changeClass = isPositive ? 'text-success' : 'text-danger';
+        const changeIcon = isPositive ? '▲' : '▼';
+        const formattedChange = `${isPositive ? '+' : ''}${change.toFixed(2)}%`;
+        
+        // Format volume with commas for thousands
+        const formattedVolume = volume.toLocaleString();
         
         return `
             <tr>
-                <td><strong>${stock.symbol}</strong></td>
-                <td>₹${stock.current_price?.toFixed(2) || 'N/A'}</td>
-                <td class="${priceChangeClass}">
-                    ${priceChangeIcon} ${Math.abs(priceChange).toFixed(2)}%
+                <td><strong>${stock.symbol || 'N/A'}</strong></td>
+                <td>₹${price.toFixed(2)}</td>
+                <td class="${changeClass}">
+                    ${changeIcon} ${formattedChange}
                 </td>
-                <td>${stock.volume ? stock.volume.toLocaleString() : 'N/A'}</td>
-                <td class="${volumeChangeClass}">
-                    ${volumeChangeIcon} ${Math.abs(volumeChange).toFixed(2)}%
-                </td>
+                <td>${formattedVolume}</td>
+                <td>${tradeCount.toLocaleString()}</td>
                 <td>
                     <button class="btn btn-sm btn-outline-primary analyze-volume-stock" data-symbol="${stock.symbol}">
                         <i class="fas fa-search"></i> Analyze

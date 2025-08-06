@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -924,17 +924,27 @@ async def get_ipo_calendar(days: int = 30):
         }, status_code=500)
 
 @app.get("/api/volume/top")
-async def get_top_volume_stocks():
+async def get_top_volume_stocks(
+    limit: int = Query(10, description="Number of stocks to return per category"),
+    min_volume: int = Query(10000, description="Minimum volume threshold")
+):
     """
-    Get today's top volume stocks (most bought and most sold)
+    Get today's top volume stocks with trade count and size metrics
+    
+    Returns:
+        - top_by_volume: Stocks with highest trading volume
+        - top_by_trade_count: Stocks with most number of trades
+        - top_by_avg_trade_size: Stocks with largest average trade size
+        - most_active: Stocks with highest volume increase
+        - market_summary: Aggregated market statistics
     """
     print("\n" + "="*50)
     print("📡 /api/volume/top endpoint called")
     
     try:
-        # Get the volume data
-        print("🔄 Fetching top volume data...")
-        result = volume_tracker.get_top_volume_stocks()
+        # Get the volume data with trade metrics
+        print(f"🔄 Fetching top volume data (limit: {limit}, min_volume: {min_volume})...")
+        result = volume_tracker.get_top_volume_stocks(limit=limit, min_volume=min_volume)
         print(f"✅ Got result from volume_tracker: {bool(result)}")
         
         # If there was an error in the volume tracker, return it
@@ -944,32 +954,36 @@ async def get_top_volume_stocks():
             return {
                 'success': False,
                 'error': error_msg,
-                'debug': 'Error in volume_tracker.get_top_volume_stocks()',
                 'data': {
-                    'most_bought': [],
-                    'most_sold': [],
+                    'top_by_volume': [],
+                    'top_by_trade_count': [],
+                    'top_by_avg_trade_size': [],
+                    'most_active': [],
+                    'market_summary': {},
                     'timestamp': datetime.now().isoformat()
                 }
             }
             
-        # Structure the response to match what the frontend expects
-        most_bought = result.get('most_bought', [])
-        most_sold = result.get('most_sold', [])
-        
-        print(f"📊 Data stats - Most Bought: {len(most_bought)}, Most Sold: {len(most_sold)}")
-        
-        if most_bought:
-            print("📈 Sample most bought:", {k: v for k, v in most_bought[0].items() if k != 'timestamp'})
-        if most_sold:
-            print("📉 Sample most sold:", {k: v for k, v in most_sold[0].items() if k != 'timestamp'})
-            
+        # Format the response
         response_data = {
-            'most_bought': most_bought,
-            'most_sold': most_sold,
+            'top_by_volume': result.get('top_by_volume', []),
+            'top_by_trade_count': result.get('top_by_trade_count', []),
+            'top_by_avg_trade_size': result.get('top_by_avg_trade_size', []),
+            'most_active': result.get('most_active', []),
+            'market_summary': result.get('market_summary', {}),
             'timestamp': result.get('timestamp', datetime.now().isoformat())
         }
         
-        print("✅ Sending response with volume data")
+        print(f"📊 Data stats - Top Volume: {len(response_data['top_by_volume'])}, "
+              f"Top Trades: {len(response_data['top_by_trade_count'])}, "
+              f"Most Active: {len(response_data['most_active'])}")
+              
+        if response_data['top_by_volume']:
+            print("📈 Sample volume data:", 
+                  {k: v for k, v in response_data['top_by_volume'][0].items() 
+                   if k in ['symbol', 'volume', 'trade_count', 'avg_trade_size', 'trade_activity']})
+        
+        print("✅ Sending response with enhanced volume data")
         print("="*50 + "\n")
         
         return {
@@ -988,8 +1002,11 @@ async def get_top_volume_stocks():
             'error': f'Failed to fetch volume data: {str(e)}',
             'debug': error_trace,
             'data': {
-                'most_bought': [],
-                'most_sold': [],
+                'top_by_volume': [],
+                'top_by_trade_count': [],
+                'top_by_avg_trade_size': [],
+                'most_active': [],
+                'market_summary': {},
                 'timestamp': datetime.now().isoformat()
             }
         }
@@ -1022,20 +1039,105 @@ async def test_volume_data():
         return {"success": False, "error": str(e), "trace": error_trace}
 
 @app.get("/api/volume/stock/{symbol}")
-async def get_stock_volume_data(symbol: str):
+async def get_stock_volume_data(
+    symbol: str,
+    days: int = Query(5, description="Number of days of historical data to analyze")
+):
     """
-    Get volume data for a specific stock
+    Get detailed volume analysis for a specific stock
+    
+    Args:
+        symbol: Stock symbol (e.g., RELIANCE, TCS)
+        days: Number of days of historical data to analyze
+        
+    Returns:
+        - Current day's volume metrics
+        - Historical volume trends
+        - Trade count and size analysis
     """
+    print(f"\n📡 /api/volume/stock/{symbol} endpoint called (days: {days})")
+    
     try:
-        data = volume_tracker.get_stock_volume_data(symbol.upper())
-        if data:
-            return {"success": True, "data": data}
-        else:
-            return {"success": False, "error": f"No data found for {symbol}"}
+        # Get current day's data
+        current_data = volume_tracker.get_stock_volume_data(symbol.upper())
+        if not current_data:
+            print(f"❌ No data found for symbol {symbol}")
+            return {
+                "success": False, 
+                "error": f"No data found for {symbol}"
+            }
+        
+        print(f"✅ Got current data for {symbol}")
+        
+        # Get historical data
+        try:
+            stock = yf.Ticker(f"{symbol.upper()}.NS")
+            hist = stock.history(period=f"{days+1}d", interval="1d")
+            
+            # Prepare historical data
+            history = []
+            for i in range(1, len(hist)):
+                day_data = hist.iloc[i]
+                prev_day = hist.iloc[i-1]
+                
+                volume = int(day_data['Volume'])
+                prev_volume = int(prev_day['Volume'])
+                volume_change = volume - prev_volume
+                volume_change_pct = ((volume - prev_volume) / prev_volume * 100) if prev_volume > 0 else 0
+                
+                history.append({
+                    'date': day_data.name.strftime('%Y-%m-%d'),
+                    'volume': volume,
+                    'volume_change': volume_change,
+                    'volume_change_pct': round(volume_change_pct, 2),
+                    'price': round(float(day_data['Close']), 2),
+                    'price_change': round(float(day_data['Close'] - day_data['Open']), 2),
+                    'price_change_pct': round(((day_data['Close'] - day_data['Open']) / day_data['Open'] * 100), 2)
+                })
+            
+            # Calculate volume statistics
+            volumes = [h['volume'] for h in history]
+            volume_avg = sum(volumes) / len(volumes) if volumes else 0
+            
+            response = {
+                'symbol': symbol.upper(),
+                'current': current_data,
+                'history': history,
+                'stats': {
+                    'avg_volume': int(volume_avg),
+                    'max_volume': max(volumes) if volumes else 0,
+                    'min_volume': min(volumes) if volumes else 0,
+                    'current_volume_vs_avg': round((current_data['volume'] - volume_avg) / volume_avg * 100, 2) if volume_avg > 0 else 0
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            print(f"✅ Successfully processed historical data for {symbol} ({len(history)} days)")
+            return {"success": True, "data": response}
+            
+        except Exception as hist_error:
+            print(f"⚠️ Error fetching historical data: {str(hist_error)}")
+            # Return current data even if historical fetch fails
+            return {
+                "success": True,
+                "data": {
+                    'symbol': symbol.upper(),
+                    'current': current_data,
+                    'history': [],
+                    'stats': {},
+                    'timestamp': datetime.now().isoformat()
+                }
+            }
+            
     except Exception as e:
         import traceback
-        print(f"Error in get_stock_volume_data: {traceback.format_exc()}")
-        return {"success": False, "error": str(e)}
+        error_trace = traceback.format_exc()
+        print(f"❌ Error in get_stock_volume_data: {error_trace}")
+        return {
+            "success": False, 
+            "error": f"Failed to fetch volume data: {str(e)}",
+            "debug": error_trace
+        }
 
 if __name__ == "__main__":
     import uvicorn

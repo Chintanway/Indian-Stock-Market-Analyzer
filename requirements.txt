@@ -29,6 +29,7 @@ alembic==1.11.3
 
 # Stock data
 yfinance==0.2.31
+nsetools==0.10.0
 
 # Utilities
 python-dotenv==1.0.0

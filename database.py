@@ -36,6 +36,12 @@ class StockAnalysis(Base):
     ema_5 = Column(Float)
     macd = Column(Float)
     macd_signal = Column(Float)
+    
+    # Volume metrics
+    trade_count = Column(Integer, default=0)  # Number of trades
+    total_volume = Column(Float, default=0)  # Total volume in units
+    avg_trade_size = Column(Float, default=0)  # Average size per trade
+    volume_change_pct = Column(Float, default=0)  # Percentage change in volume vs avg
     macd_histogram = Column(Float)
     sma_20 = Column(Float)
     bb_upper = Column(Float)

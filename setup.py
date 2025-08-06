@@ -7,10 +7,11 @@ setup(
     install_requires=[
         'fastapi==0.68.2',
         'uvicorn[standard]==0.15.0',
-        'python-multipart==0.0.5',
+        'python-multipart==0.0.20',
         'pandas==1.5.3',
         'numpy==1.24.4',
         'pandas-ta==0.3.14b0',
+        'nsetools==1.1.8',
         'scikit-learn==1.2.2',
         'statsmodels==0.13.5',
         'plotly==5.15.0',
@@ -26,5 +27,5 @@ setup(
         'psycopg2-binary==2.9.7',
         'Cython==0.29.36'
     ],
-    python_requires='>=3.9, <3.10',
+    python_requires='>=3.9, <3.12',
 )
