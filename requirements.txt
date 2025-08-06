@@ -3,40 +3,40 @@ setuptools>=68.0.0
 wheel>=0.40.0
 
 # Application dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6  # Updated to a compatible version
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6  # Updated to a compatible version
 
 # Data processing
-pandas==2.1.1
-numpy==1.26.0
-pandas-ta==0.3.14b0
-scikit-learn==1.3.2
-statsmodels==0.14.0
+pandas>=2.3.1
+numpy>=1.26.0
+pandas-ta>=0.3.14b0
+scikit-learn>=1.3.2
+statsmodels>=0.14.0
 
 # Visualization
-plotly==5.18.0
-matplotlib==3.8.0
+plotly>=5.18.0
+matplotlib>=3.8.0
 
 # Web and API
-jinja2==3.1.2
-requests==2.31.0
-beautifulsoup4==4.12.2
+jinja2>=3.1.2
+requests>=2.31.0
+beautifulsoup4>=4.12.2
 
 # Database
-sqlalchemy==2.0.23
-alembic==1.12.1
+sqlalchemy>=2.0.23
+alembic>=1.12.1
 
 # Stock data
-yfinance==0.2.33  # Updated to latest stable version
+yfinance>=0.2.33  # Updated to latest stable version
 
 # Utilities
-python-dotenv==1.0.0
-gunicorn==21.2.0
-psycopg2-binary==2.9.9  # For PostgreSQL support
+python-dotenv>=1.0.0
+gunicorn>=21.2.0
+psycopg2-binary>=2.9.9  # For PostgreSQL support
 
 # Additional dependencies
-Cython==3.0.5
+Cython>=3.0.5
 
 # Ensure binary packages are used where available
 --only-binary=:all:
