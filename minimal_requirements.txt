@@ -16,7 +16,7 @@ uvicorn[standard]>=0.24.0
 python-multipart>=0.0.6
 
 # Technical analysis
-pandas-ta>=0.3.14b0
+pandas-ta>=0.3.14
 
 # For visualization (optional)
 matplotlib>=3.8.0
