@@ -1,327 +1,356 @@
 """
 Advanced AI Models for Stock Prediction
-- Facebook Prophet for time series forecasting
-- LSTM Neural Networks for deep learning predictions
-- ARIMA for classical time series analysis
+- XGBoost with hyperparameter tuning
+- Feature importance analysis
+- Advanced technical indicators
+- Prediction intervals
 """
 
 import pandas as pd
 import numpy as np
 import warnings
+import joblib
+import xgboost as xgb
+from sklearn.model_selection import TimeSeriesSplit, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+import pandas_ta as ta
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+
 warnings.filterwarnings('ignore')
-
-# Try importing advanced models with fallbacks
-try:
-    from prophet import Prophet
-    PROPHET_AVAILABLE = True
-except ImportError:
-    PROPHET_AVAILABLE = False
-    print("Prophet not available")
-
-try:
-    from statsmodels.tsa.arima.model import ARIMA
-    ARIMA_AVAILABLE = True
-except ImportError:
-    ARIMA_AVAILABLE = False
-    print("ARIMA not available")
-
-# Skip TensorFlow/LSTM for now due to numpy compatibility issues
-LSTM_AVAILABLE = False
-print("LSTM temporarily disabled due to numpy compatibility")
 
 class AdvancedStockPredictor:
     def __init__(self):
-        self.prophet_model = None
-        self.lstm_model = None
-        self.arima_model = None
-        self.scaler = None
+        self.model = None
+        self.scaler = StandardScaler()
+        self.feature_importances_ = None
+        self.model_path = "advanced_stock_model.joblib"
+        self.scaler_path = "advanced_scaler.joblib"
         
-    def prepare_prophet_data(self, data):
-        """Prepare data for Facebook Prophet"""
+    def calculate_indicators(self, data):
+        """Enhanced technical indicators calculation"""
         df = data.copy()
-        df = df.reset_index()
-        df = df.rename(columns={'Date': 'ds', 'Close': 'y'})
         
-        # Convert to datetime and remove timezone to fix Prophet error
-        df['ds'] = pd.to_datetime(df['ds'])
-        if hasattr(df['ds'].dtype, 'tz') and df['ds'].dtype.tz is not None:
-            df['ds'] = df['ds'].dt.tz_localize(None)
+        # Ensure numeric data
+        for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        return df[['ds', 'y']]
+        # Price action features
+        df['Returns'] = df['Close'].pct_change()
+        df['Log_Returns'] = np.log1p(df['Returns'])
+        df['Range'] = df['High'] - df['Low']
+        df['Body'] = (df['Close'] - df['Open']).abs()
+        df['Body/Range'] = df['Body'] / df['Range'].replace(0, 0.001)
+        
+        # Volatility indicators
+        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+        df['VWAP'] = ta.vwap(df['High'], df['Low'], df['Close'], df['Volume'])
+        df['BB_Width'] = (df['BB_Upper'] - df['BB_Lower']) / df['BB_Middle']
+        
+        # Momentum indicators
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        df['Stoch_RSI'] = ta.stochrsi(df['Close'], length=14, rsi_length=14, k=3, d=3)['STOCHRSIk_14_14_3_3']
+        df['ROC'] = ta.roc(df['Close'], length=5)
+        df['MACD_Line'] = ta.macd(df['Close'])['MACD_12_26_9']
+        df['MACD_Signal'] = ta.macd(df['Close'])['MACDs_12_26_9']
+        df['MACD_Hist'] = ta.macd(df['Close'])['MACDh_12_26_9']
+        
+        # Volume indicators
+        df['OBV'] = ta.obv(df['Close'], df['Volume'])
+        df['CMF'] = ta.cmf(df['High'], df['Low'], df['Close'], df['Volume'], length=20)
+        df['VPT'] = ta.pvi(df['Close'], df['Volume']) + ta.nvi(df['Close'], df['Volume'])
+        
+        # Moving Averages
+        for period in [5, 10, 20, 50, 100, 200]:
+            df[f'SMA_{period}'] = ta.sma(df['Close'], length=period)
+            df[f'EMA_{period}'] = ta.ema(df['Close'], length=period)
+        
+        # Price to Moving Averages ratios
+        for period in [20, 50, 200]:
+            df[f'Close_SMA{period}_Ratio'] = df['Close'] / df[f'SMA_{period}']
+            df[f'Close_EMA{period}_Ratio'] = df['Close'] / df[f'EMA_{period}']
+        
+        # Pattern recognition
+        df['CDL_DOJI'] = ta.cdl_doji(df['Open'], df['High'], df['Low'], df['Close'])
+        df['CDL_ENGULFING'] = ta.cdl_engulfing(df['Open'], df['High'], df['Low'], df['Close'])
+        
+        # Drop any remaining NaN values
+        df = df.dropna()
+        
+        return df
     
-    def train_prophet_model(self, data):
-        """Train Facebook Prophet model"""
-        try:
-            if not PROPHET_AVAILABLE:
-                return False
-                
-            prophet_data = self.prepare_prophet_data(data)
-            
-            # Configure Prophet with Indian market characteristics
-            self.prophet_model = Prophet(
-                changepoint_prior_scale=0.05,  # Flexibility in trend changes
-                seasonality_prior_scale=10.0,  # Seasonality strength
-                holidays_prior_scale=10.0,     # Holiday effects
-                daily_seasonality=True,        # Daily patterns
-                weekly_seasonality=True,       # Weekly patterns
-                yearly_seasonality=True,       # Yearly patterns
-                interval_width=0.80           # Confidence intervals
-            )
-            
-            # Add custom seasonalities for Indian market
-            self.prophet_model.add_seasonality(
-                name='monthly', period=30.5, fourier_order=5
-            )
-            
-            self.prophet_model.fit(prophet_data)
-            return True
-            
-        except Exception as e:
-            print(f"Prophet training error: {e}")
-            return False
+    def prepare_features(self, data):
+        """Prepare features for the model"""
+        # Calculate all indicators
+        df = self.calculate_indicators(data)
+        
+        # Define feature columns (excluding target and date columns)
+        feature_columns = [col for col in df.columns if col not in ['Date', 'Target'] and not col.startswith('CDL_')]
+        
+        # Create target (next day's closing price)
+        df['Target'] = df['Close'].shift(-1)
+        
+        # Remove rows with NaN values
+        clean_df = df.dropna()
+        
+        if len(clean_df) < 30:
+            raise ValueError("Insufficient data for prediction")
+        
+        X = clean_df[feature_columns]
+        y = clean_df['Target']
+        
+        return X, y, clean_df
     
-    def predict_with_prophet(self, periods=1):
-        """Make predictions using Prophet"""
-        try:
-            if not self.prophet_model:
-                return None
-                
-            future = self.prophet_model.make_future_dataframe(periods=periods)
-            forecast = self.prophet_model.predict(future)
-            
-            return {
-                'predicted_price': float(forecast['yhat'].iloc[-1]),
-                'lower_bound': float(forecast['yhat_lower'].iloc[-1]),
-                'upper_bound': float(forecast['yhat_upper'].iloc[-1]),
-                'trend': float(forecast['trend'].iloc[-1])
-            }
-            
-        except Exception as e:
-            print(f"Prophet prediction error: {e}")
-            return None
-    
-    def prepare_lstm_data(self, data, lookback=60):
-        """Prepare data for LSTM model"""
-        from sklearn.preprocessing import MinMaxScaler
+    def train_advanced_model(self, X, y):
+        """Train XGBoost model with hyperparameter tuning"""
+        # Time-series cross-validation
+        tscv = TimeSeriesSplit(n_splits=5)
         
-        prices = data['Close'].values.reshape(-1, 1)
+        # Scale features
+        X_scaled = self.scaler.fit_transform(X)
         
-        # Scale the data
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
-        scaled_prices = self.scaler.fit_transform(prices)
+        # Define parameter grid
+        param_grid = {
+            'n_estimators': [100, 200],
+            'max_depth': [3, 5, 7],
+            'learning_rate': [0.01, 0.05],
+            'subsample': [0.8, 0.9],
+            'colsample_bytree': [0.8, 0.9],
+            'min_child_weight': [1, 3, 5]
+        }
         
-        # Create sequences
-        X, y = [], []
-        for i in range(lookback, len(scaled_prices)):
-            X.append(scaled_prices[i-lookback:i, 0])
-            y.append(scaled_prices[i, 0])
-        
-        return np.array(X), np.array(y)
-    
-    def build_lstm_model(self, input_shape):
-        """Build LSTM neural network"""
-        model = Sequential([
-            LSTM(50, return_sequences=True, input_shape=input_shape),
-            Dropout(0.2),
-            LSTM(50, return_sequences=True),
-            Dropout(0.2),
-            LSTM(50),
-            Dropout(0.2),
-            Dense(1)
-        ])
-        
-        model.compile(
-            optimizer=Adam(learning_rate=0.001),
-            loss='mse',
-            metrics=['mae']
+        # Initialize XGBoost model
+        xgb_model = xgb.XGBRegressor(
+            objective='reg:squarederror',
+            random_state=42,
+            n_jobs=-1,
+            early_stopping_rounds=50
         )
         
-        return model
+        # Grid search with time series cross-validation
+        grid_search = GridSearchCV(
+            estimator=xgb_model,
+            param_grid=param_grid,
+            cv=tscv,
+            scoring='neg_mean_squared_error',
+            n_jobs=-1,
+            verbose=1
+        )
+        
+        # Fit the model
+        print("Training XGBoost model with hyperparameter tuning...")
+        grid_search.fit(X_scaled, y)
+        
+        # Get best model
+        self.model = grid_search.best_estimator_
+        self.feature_importances_ = self.model.feature_importances_
+        
+        # Save model and scaler
+        joblib.dump(self.model, self.model_path)
+        joblib.dump(self.scaler, self.scaler_path)
+        
+        # Plot feature importance
+        self.plot_feature_importance(X.columns)
+        
+        return {
+            'best_params': grid_search.best_params_,
+            'best_score': -grid_search.best_score_,
+            'feature_importances': dict(zip(X.columns, self.feature_importances_))
+        }
     
-    def train_lstm_model(self, data):
-        """Train LSTM model - temporarily disabled"""
-        return False
-    
-    def predict_with_lstm(self, data):
-        """Make predictions using LSTM - temporarily disabled"""
-        return None
-    
-    def train_arima_model(self, data, order=(5,1,0)):
-        """Train ARIMA model"""
-        try:
-            if not ARIMA_AVAILABLE:
-                return False
-                
-            prices = data['Close'].values
+    def plot_feature_importance(self, feature_names, top_n=20):
+        """Plot feature importance"""
+        if self.feature_importances_ is None:
+            return
             
-            # Fit ARIMA model
-            self.arima_model = ARIMA(prices, order=order)
-            self.arima_fitted = self.arima_model.fit()
-            
-            return True
-            
-        except Exception as e:
-            print(f"ARIMA training error: {e}")
-            return False
+        # Create DataFrame with feature importances
+        importance_df = pd.DataFrame({
+            'Feature': feature_names,
+            'Importance': self.feature_importances_
+        }).sort_values('Importance', ascending=False).head(top_n)
+        
+        # Plot
+        plt.figure(figsize=(12, 8))
+        plt.barh(importance_df['Feature'], importance_df['Importance'])
+        plt.xlabel('Importance')
+        plt.title('Feature Importance')
+        plt.tight_layout()
+        
+        # Save the plot
+        plt.savefig('feature_importance.png')
+        plt.close()
     
-    def predict_with_arima(self, steps=1):
-        """Make predictions using ARIMA"""
-        try:
-            if not self.arima_fitted:
-                return None
-                
-            forecast = self.arima_fitted.forecast(steps=steps)
-            return float(forecast[0]) if steps == 1 else forecast.tolist()
+    def predict(self, data):
+        """Make predictions using the trained model"""
+        if self.model is None:
+            raise ValueError("Model not trained. Please train the model first.")
+        
+        # Prepare features
+        X, _, _ = self.prepare_features(data)
+        
+        # Scale features
+        X_scaled = self.scaler.transform(X)
+        
+        # Make predictions
+        predictions = self.model.predict(X_scaled)
+        
+        # Get prediction intervals using bootstrapping
+        n_bootstraps = 1000
+        bootstrap_preds = np.zeros((n_bootstraps, len(X)))
+        
+        for i in range(n_bootstraps):
+            # Sample with replacement
+            sample_idx = np.random.choice(len(X), size=len(X), replace=True)
+            X_sample = X_scaled[sample_idx]
+            y_sample = predictions[sample_idx]
             
-        except Exception as e:
-            print(f"ARIMA prediction error: {e}")
-            return None
+            # Train a simple model on the bootstrap sample
+            model = xgb.XGBRegressor(n_estimators=50, random_state=i)
+            model.fit(X_sample, y_sample)
+            
+            # Store predictions
+            bootstrap_preds[i] = model.predict(X_scaled)
+        
+        # Calculate confidence intervals
+        lower_bound = np.percentile(bootstrap_preds, 2.5, axis=0)
+        upper_bound = np.percentile(bootstrap_preds, 97.5, axis=0)
+        
+        return {
+            'predictions': predictions,
+            'lower_bound': lower_bound,
+            'upper_bound': upper_bound,
+            'confidence_interval': list(zip(lower_bound, upper_bound)),
+            'volatility': np.std(bootstrap_preds, axis=0)
+        }
     
-    def ensemble_prediction(self, data, model_weights=None):
-        """
-        Combine predictions from multiple models using weighted averaging.
+    def predict_next_day(self, symbol, period='1y'):
+        """Predict the next day's price for a given stock
         
         Args:
-            data: DataFrame containing stock price data
-            model_weights: Optional dictionary specifying weights for each model.
-                         If None, uses default weights: {'prophet': 0.4, 'arima': 0.3, 'lstm': 0.3}
-                         
-        Returns:
-            dict: Contains ensemble prediction, individual model predictions, weights,
-                 confidence score, and any error messages.
-        """
-        if model_weights is None:
-            model_weights = {
-                'prophet': 0.4,  # 40% weight
-                'arima': 0.3,    # 30% weight
-                'lstm': 0.3      # 30% weight (if available)
-            }
+            symbol (str): Stock symbol (with or without .NS suffix)
+            period (str): Data period to fetch (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
             
-        predictions = {}
-        errors = {}
+        Returns:
+            dict: Prediction details including price, confidence interval, and metrics
+        """
+        import yfinance as yf
+        from datetime import datetime, timedelta
         
         try:
-            # Prophet prediction
+            # Clean and validate symbol
+            symbol = str(symbol).upper().strip()
+            
+            # Add .NS suffix for NSE if not present and not already a yfinance symbol
+            if not any(symbol.endswith(ext) for ext in ['.NS', '.BO', '.SR', '.BS']):
+                symbol += '.NS'  # Default to NSE
+            
+            # Check if symbol exists with a direct API call
+            ticker = yf.Ticker(symbol)
+            
+            # Try to get info to verify symbol exists
             try:
-                if self.train_prophet_model(data):
-                    prophet_pred = self.predict_with_prophet()
-                    if prophet_pred and 'predicted_price' in prophet_pred:
-                        predictions['prophet'] = float(prophet_pred['predicted_price'])
+                info = ticker.info
+                if not info or 'regularMarketPrice' not in info:
+                    raise ValueError(f"No data found for {symbol}")
+                
+                # Get company name or use symbol as fallback
+                company_name = info.get('shortName', symbol)
+                sector = info.get('sector', 'N/A')
+                current_price = info.get('regularMarketPrice', 0)
+                
             except Exception as e:
-                errors['prophet'] = str(e)
+                raise ValueError(f"Could not fetch data for {symbol}: {str(e)}")
             
-            # ARIMA prediction
+            # Fetch historical data with error handling
             try:
-                if self.train_arima_model(data):
-                    arima_pred = self.predict_with_arima()
-                    if arima_pred is not None:
-                        predictions['arima'] = float(arima_pred) if not isinstance(arima_pred, (list, np.ndarray)) else float(arima_pred[0])
+                # Try with auto_adjust first
+                data = ticker.history(period=period, auto_adjust=True)
+                
+                # If no data, try without auto_adjust
+                if data.empty:
+                    data = ticker.history(period=period, auto_adjust=False)
+                
+                # If still no data, try with a different period
+                if data.empty and period != '2y':
+                    data = ticker.history(period='2y', auto_adjust=True)
+                
+                if data.empty:
+                    raise ValueError(f"No historical data available for {symbol}")
+                    
             except Exception as e:
-                errors['arima'] = str(e)
+                raise ValueError(f"Error fetching data for {symbol}: {str(e)}")
             
-            # LSTM prediction (disabled by default, can be enabled by uncommenting and implementing)
-            # try:
-            #     if LSTM_AVAILABLE and self.train_lstm_model(data):
-            #         lstm_pred = self.predict_with_lstm(data)
-            #         if lstm_pred is not None:
-            #             predictions['lstm'] = float(lstm_pred) if not isinstance(lstm_pred, (list, np.ndarray)) else float(lstm_pred[0])
-            # except Exception as e:
-            #     errors['lstm'] = str(e)
+            # Ensure we have enough data
+            min_days_required = 60
+            if len(data) < min_days_required:
+                raise ValueError(f"Insufficient data points ({len(data)} < {min_days_required})")
             
-            # Calculate weighted ensemble
-            if not predictions:
+            # Prepare features for the last day
+            try:
+                X, y, _ = self.prepare_features(data)
+            except Exception as e:
+                raise ValueError(f"Error preparing features: {str(e)}")
+            
+            # If model doesn't exist, train it
+            if self.model is None:
+                print(f"Training model for {symbol}...")
+                try:
+                    training_result = self.train_advanced_model(X, y)
+                    print(f"Model trained with score: {training_result['best_score']:.4f}")
+                except Exception as e:
+                    raise ValueError(f"Error training model: {str(e)}")
+            
+            # Get the most recent data point
+            latest_features = X.iloc[[-1]]
+            
+            # Make prediction
+            try:
+                prediction = self.model.predict(self.scaler.transform(latest_features))[0]
+                
+                # Get prediction interval
+                preds = self.predict(data)
+                lower = preds['lower_bound'][-1]
+                upper = preds['upper_bound'][-1]
+                
+                # Calculate potential return
+                potential_return = ((prediction - current_price) / current_price) * 100
+                
+                # Generate signal
+                signal = "NEUTRAL"
+                if potential_return > 5:
+                    signal = "STRONG BUY"
+                elif potential_return > 2:
+                    signal = "BUY"
+                elif potential_return < -5:
+                    signal = "STRONG SELL"
+                elif potential_return < -2:
+                    signal = "SELL"
+                
                 return {
-                    'error': 'No models produced valid predictions',
-                    'errors': errors
+                    'symbol': symbol,
+                    'name': company_name,
+                    'last_price': round(float(current_price), 2),
+                    'predicted_price': round(float(prediction), 2),
+                    'confidence_interval': [round(float(lower), 2), round(float(upper), 2)],
+                    'prediction_date': (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d'),
+                    'volatility': round(float(np.std([lower, upper]) / prediction * 100), 2),
+                    'potential_return': round(potential_return, 2),
+                    'signal': signal,
+                    'exchange': 'NSE' if symbol.endswith('.NS') else 'BSE' if symbol.endswith('.BO') else 'Unknown',
+                    'sector': sector,
+                    'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': 'success'
                 }
-            
-            # Filter weights to only include models that produced predictions
-            valid_weights = {k: v for k, v in model_weights.items() if k in predictions}
-            total_weight = sum(valid_weights.values())
-            
-            # If no valid weights, use equal weights
-            if total_weight <= 0:
-                valid_weights = {model: 1.0/len(predictions) for model in predictions}
-                total_weight = 1.0
-            
-            # Calculate weighted average
-            ensemble_price = sum(
-                predictions[model] * (valid_weights[model] / total_weight)
-                for model in predictions if model in valid_weights
-            )
-            
-            # Calculate confidence based on model agreement and prediction variance
-            if len(predictions) > 1:
-                pred_values = np.array(list(predictions.values()))
-                pred_std = np.std(pred_values) / np.mean(np.abs(pred_values)) if np.mean(np.abs(pred_values)) > 0 else 0
-                confidence = max(0, 1 - pred_std) * (len(predictions) / len(model_weights))
-            else:
-                confidence = 0.5  # Lower confidence for single model
-            
-            return {
-                'ensemble_prediction': float(ensemble_price),
-                'individual_predictions': predictions,
-                'model_weights': valid_weights,
-                'confidence': min(1.0, max(0.0, confidence)),  # Ensure between 0 and 1
-                'errors': errors if errors else None
-            }
+                
+            except Exception as e:
+                raise ValueError(f"Error making prediction: {str(e)}")
             
         except Exception as e:
+            # Return error information
             return {
-                'error': f'Error in ensemble prediction: {str(e)}',
-                'errors': errors
+                'error': f"Error predicting for {symbol}",
+                'details': str(e),
+                'status': 'error',
+                'symbol': symbol,
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
-    
-    def get_model_performance(self, data):
-        """Get performance metrics for all models"""
-        performance = {}
-        
-        if len(data) < 100:
-            return {'error': 'Insufficient data for performance evaluation'}
-        
-        # Use last 20% of data for testing
-        split_idx = int(0.8 * len(data))
-        train_data = data.iloc[:split_idx]
-        test_data = data.iloc[split_idx:]
-        
-        actual_prices = test_data['Close'].values
-        
-        # Test each model
-        for model_name in ['prophet', 'lstm', 'arima']:
-            try:
-                if model_name == 'prophet' and self.train_prophet_model(train_data):
-                    predictions = []
-                    for i in range(len(test_data)):
-                        pred = self.predict_with_prophet(1)
-                        if pred:
-                            predictions.append(pred['predicted_price'])
-                
-                elif model_name == 'lstm' and self.train_lstm_model(train_data):
-                    pred = self.predict_with_lstm(train_data)
-                    if pred:
-                        predictions = [pred] * len(test_data)  # Single prediction
-                
-                elif model_name == 'arima' and self.train_arima_model(train_data):
-                    predictions = []
-                    for i in range(len(test_data)):
-                        pred = self.predict_with_arima(1)
-                        if pred:
-                            predictions.append(pred)
-                
-                if 'predictions' in locals() and predictions:
-                    # Calculate metrics
-                    mse = np.mean((actual_prices[:len(predictions)] - predictions) ** 2)
-                    mae = np.mean(np.abs(actual_prices[:len(predictions)] - predictions))
-                    mape = np.mean(np.abs((actual_prices[:len(predictions)] - predictions) / actual_prices[:len(predictions)])) * 100
-                    
-                    performance[model_name] = {
-                        'mse': float(mse),
-                        'mae': float(mae),
-                        'mape': float(mape),
-                        'accuracy': max(0, 100 - mape)
-                    }
-                
-            except Exception as e:
-                performance[model_name] = {'error': str(e)}
-        
-        return performance
